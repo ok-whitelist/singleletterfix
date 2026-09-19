@@ -140,6 +140,7 @@ def main():
     written = skipped = maps_hit = maps_skipped = 0
     written_bytes = 0
     clashes = []
+    unreadable = []
     new_state = []
     wrote = []
 
@@ -184,7 +185,12 @@ def main():
                 skipped += 1
                 continue
 
-            data = z.read(name)
+            try:
+                data = z.read(name)
+            except Exception as e:
+                # a truncated or corrupt pakfile entry should not take the map with it
+                unreadable.append((mapname, name, e))
+                continue
             for dest, compress in todo:
                 os.makedirs(os.path.dirname(dest), exist_ok=True)
                 with open(dest, "wb") as f:
@@ -216,6 +222,10 @@ def main():
         print("maps unchanged since last run: %d" % maps_skipped)
     print("files written: %d (%.1f MiB), already present: %d"
           % (written, written_bytes / 1048576, skipped))
+    if unreadable:
+        print("\n%d packed files could not be read:" % len(unreadable))
+        for mapname, name, e in unreadable[:20]:
+            print("   %s: %s (%s)" % (mapname, name, e))
     if clashes:
         print("\n%d flattened paths collided with different content:" % len(clashes))
         for mapname, name, target in clashes[:20]:
